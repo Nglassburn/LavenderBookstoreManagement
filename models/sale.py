@@ -23,11 +23,14 @@ class Sale:
         self.total_amount = sum(book[4] for book in self.books)
 
     def record_sale(self, db):
-        db.execute("INSERT INTO sales (date, total_amount, customer_id) VALUES (?, ?, ?)",
-                   (self.date, self.total_amount, self.customer_id))
-        sale_id = db.cursor.lastrowid
-        for book in self.books:
-            db.execute("INSERT INTO sale_books (sale_id, book_id) VALUES (?, ?)", (sale_id, book[0]))
+        try:
+            db.execute("INSERT INTO sales (date, total_amount, customer_id) VALUES (?, ?, ?)",
+                       (self.date, self.total_amount, self.customer_id))
+            sale_id = db.cursor.lastrowid
+            for book in self.books:
+                db.execute("INSERT INTO sale_books (sale_id, book_id) VALUES (?, ?)", (sale_id, book[0]))
+        except Exception as e:
+            print(f"Error recording sale: {e}")
 
     def get_sale_details(self):
         return {

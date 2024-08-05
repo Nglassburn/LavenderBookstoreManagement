@@ -17,17 +17,35 @@ class Book:
             "stock_quantity": self.stock_quantity
         }
 
-    def add_book(self, db):
-        db.execute(
-            "INSERT INTO books (title, author, genre, price, stock_quantity) VALUES (?, ?, ?, ?, ?)",
-            (self.title, self.author, self.genre, self.price, self.stock_quantity)
-        )
-        self.id = db.cursor.lastrowid  # Assign the id after insertion
+    def save_to_db(self, db):
+        existing_book = Book.find_by_title(db, self.title)
+        if existing_book:
+            db.execute(
+                "UPDATE books SET stock_quantity = stock_quantity + ? WHERE title = ?",
+                (self.stock_quantity, self.title)
+            )
+            # Fetch the updated book details to get the id
+            updated_book = Book.find_by_title(db, self.title)
+            self.id = updated_book[0]  # Assign the id from the updated book details
+        else:
+            db.execute(
+                "INSERT INTO books (title, author, genre, price, stock_quantity) VALUES (?, ?, ?, ?, ?)",
+                (self.title, self.author, self.genre, self.price, self.stock_quantity)
+            )
+            self.id = db.cursor.lastrowid
 
     @staticmethod
     def get_all_books(db):
-        return db.fetchall("SELECT * FROM books")
+        try:
+            return db.fetchall("SELECT * FROM books")
+        except Exception as e:
+            print(f"Error fetching books: {e}")
+            return []
 
     @staticmethod
-    def search_book(db, title):
-        return db.fetchone("SELECT * FROM books WHERE title = ?", (title,))
+    def find_by_title(db, title):
+        try:
+            return db.fetchone("SELECT * FROM books WHERE title = ?", (title,))
+        except Exception as e:
+            print(f"Error finding book by title: {e}")
+            return None

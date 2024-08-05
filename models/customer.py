@@ -1,34 +1,21 @@
-import json
-
 class Customer:
-    def __init__(self, customer_id, name, email, address, customer_file='data/customers.json'):
-        self.customer_id = customer_id
+    def __init__(self, name, email, address, customer_id=None):
+        self.id = customer_id
         self.name = name
         self.email = email
         self.address = address
-        self.customer_file = customer_file
-        self.load_customers()
 
-    def load_customers(self):
-        try:
-            with open(self.customer_file, 'r') as file:
-                self.customers = json.load(file)
-        except FileNotFoundError:
-            self.customers = []
+    def add_customer(self, db):
+        db.execute(
+            "INSERT INTO customers (name, email, address) VALUES (?, ?, ?)",
+            (self.name, self.email, self.address)
+        )
+        self.id = db.cursor.lastrowid  # Assign the id after insertion
 
-    def save_customers(self):
-        with open(self.customer_file, 'w') as file:
-            json.dump(self.customers, file, indent=4)
+    @staticmethod
+    def get_all_customers(db):
+        return db.fetchall("SELECT * FROM customers")
 
-    def add_customer(self):
-        self.customers.append({
-            "customer_id": self.customer_id,
-            "name": self.name,
-            "email": self.email,
-            "address": self.address
-        })
-        self.save_customers()
-
-    def remove_customer(self, customer_id):
-        self.customers = [c for c in self.customers if c["customer_id"] != customer_id]
-        self.save_customers()
+    @staticmethod
+    def search_customer(db, customer_id):
+        return db.fetchone("SELECT * FROM customers WHERE id = ?", (customer_id,))

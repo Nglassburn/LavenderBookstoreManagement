@@ -4,8 +4,11 @@ from models.inventory import Inventory
 from models.order import Order
 from models.sale import Sale
 from models.supplier import Supplier
+from db import Database
 
 def main():
+    db = Database('data/bookstore.db')
+
     # Create some sample data
     book1 = Book("Book 1", "Author 1", "Genre 1", 20.0, 10)
     book2 = Book("Book 2", "Author 2", "Genre 2", 15.0, 5)
@@ -13,7 +16,7 @@ def main():
     supplier1 = Supplier(1, "Supplier 1", "supplier1@example.com", "Supplier Address 1")
 
     # Inventory operations
-    inventory = Inventory('data/inventory.json')
+    inventory = Inventory(db)
     inventory.add_book(book1)
     inventory.add_book(book2)
     
@@ -32,22 +35,10 @@ def main():
 
     # Display inventory
     print("Inventory:")
-    for book in inventory.books:
+    for book in inventory.get_all_books():
         print(book)
 
-    # Customer operations
-    customer1.add_customer()
-    
-    # Order operations
-    order1 = Order(1, supplier1)
-    order1.add_book_to_order(book2)
-    order1.update_order_status("Shipped")
-    print("Order details:", order1.get_order_details())
-
-    # Sale operations
-    sale1 = Sale(1, customer1)
-    sale1.add_book_to_sale(book2)
-    print("Sale details:", sale1.get_sale_details())
+    db.close()
 
 if __name__ == "__main__":
     main()

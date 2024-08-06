@@ -7,26 +7,12 @@ class Book:
         self.price = price
         self.stock_quantity = stock_quantity
 
-    def get_book_details(self):
-        return {
-            "id": self.id,
-            "title": self.title,
-            "author": self.author,
-            "genre": self.genre,
-            "price": self.price,
-            "stock_quantity": self.stock_quantity
-        }
-
     def save_to_db(self, db):
-        existing_book = Book.find_by_title(db, self.title)
-        if existing_book:
+        if self.id:
             db.execute(
-                "UPDATE books SET stock_quantity = stock_quantity + ? WHERE title = ?",
-                (self.stock_quantity, self.title)
+                "UPDATE books SET title=?, author=?, genre=?, price=?, stock_quantity=? WHERE id=?",
+                (self.title, self.author, self.genre, self.price, self.stock_quantity, self.id)
             )
-            # Fetch the updated book details to get the id
-            updated_book = Book.find_by_title(db, self.title)
-            self.id = updated_book[0]  # Assign the id from the updated book details
         else:
             db.execute(
                 "INSERT INTO books (title, author, genre, price, stock_quantity) VALUES (?, ?, ?, ?, ?)",
@@ -37,15 +23,7 @@ class Book:
     @staticmethod
     def get_all_books(db):
         try:
-            return db.fetchall("SELECT * FROM books")
+            return db.fetchall("SELECT id, title, author, genre, price, stock_quantity FROM books")
         except Exception as e:
             print(f"Error fetching books: {e}")
             return []
-
-    @staticmethod
-    def find_by_title(db, title):
-        try:
-            return db.fetchone("SELECT * FROM books WHERE title = ?", (title,))
-        except Exception as e:
-            print(f"Error finding book by title: {e}")
-            return None

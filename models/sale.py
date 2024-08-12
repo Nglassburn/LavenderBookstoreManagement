@@ -8,20 +8,32 @@ class Sale:
         self.books = []
 
     def add_book_to_sale(self, db, book_id, quantity):
-        book = db.fetchone("SELECT * FROM books WHERE id = ?", (book_id,))
-        if book:
+        query = "SELECT price FROM books WHERE id = ?"
+        result = db.fetchone(query, (book_id,))
+        if result:
+            price = result[0]
+            self.total_amount += price * quantity
             self.books.append((book_id, quantity))
-            self.total_amount += book[4] * quantity  # assuming price is the 5th column in books table
         else:
             raise ValueError("Book not found")
 
     def record_sale(self, db):
-        db.execute("INSERT INTO sales (customer_id, date, total_amount) VALUES (?, ?, ?)",
-                   (self.customer_id, self.date, self.total_amount))
-        sale_id = db.fetchone("SELECT last_insert_rowid()")[0]
+        # Insert into sales table
+        sale_query = "INSERT INTO sales (customer_id, date, total_amount) VALUES (?, ?, ?)"
+        db.execute(sale_query, (self.customer_id, self.date, self.total_amount))
+
+        # Get the last inserted sale ID
+        sale_id = db.cursor.lastrowid
+
+        # Insert into sale_books table
         for book_id, quantity in self.books:
-            db.execute("INSERT INTO sale_books (sale_id, book_id, quantity) VALUES (?, ?, ?)",
-                       (sale_id, book_id, quantity))
+            sale_book_query = "INSERT INTO sale_books (sale_id, book_id, quantity) VALUES (?, ?, ?)"
+            db.execute(sale_book_query, (sale_id, book_id, quantity))
+
+        # Update the stock in the books table
+        for book_id, quantity in self.books:
+            update_stock_query = "UPDATE books SET stock_quantity = stock_quantity - ? WHERE id = ?"
+            db.execute(update_stock_query, (quantity, book_id))
 
     @staticmethod
     def get_all_sales(db):

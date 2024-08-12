@@ -27,3 +27,9 @@ class Book:
         except Exception as e:
             print(f"Error fetching books: {e}")
             return []
+    def find_by_title(db, title):
+        query = "SELECT * FROM books WHERE title = ?"
+        result = db.fetchone(query, (title,))
+        if result:
+            return Book(*result)  # Assuming your database columns match the order of your Book attributes
+        return None

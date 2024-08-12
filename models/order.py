@@ -1,28 +1,40 @@
-from datetime import date
+from datetime import datetime
 
 class Order:
-    def __init__(self, supplier_id, book_id, quantity, order_id=None, order_date=None, status='Pending'):
-        self.id = order_id
+    def __init__(self, supplier_id, book_id, quantity, date=None, status="Pending"):
         self.supplier_id = supplier_id
         self.book_id = book_id
         self.quantity = quantity
-        self.date = order_date if order_date else date.today().strftime('%Y-%m-%d')
+        self.date = date or datetime.now().strftime("%Y-%m-%d")
         self.status = status
 
     def save_to_db(self, db):
-        db.execute(
-            "INSERT INTO orders (supplier_id, book_id, quantity, date, status) VALUES (?, ?, ?, ?, ?)",
-            (self.supplier_id, self.book_id, self.quantity, self.date, self.status)
-        )
-        self.id = db.cursor.lastrowid
+        query = """
+        INSERT INTO orders (supplier_id, book_id, quantity, date, status) 
+        VALUES (?, ?, ?, ?, ?)
+        """
+        db.execute(query, (self.supplier_id, self.book_id, self.quantity, self.date, self.status))
 
     @staticmethod
     def get_all_orders(db):
-        try:
-            return db.fetchall(
-                "SELECT orders.id, suppliers.name, orders.date, orders.status, orders.book_id, orders.quantity "
-                "FROM orders JOIN suppliers ON orders.supplier_id = suppliers.id"
-            )
-        except Exception as e:
-            print(f"Error fetching orders: {e}")
-            return []
+        query = """
+        SELECT orders.id, suppliers.name, orders.date, orders.status, orders.book_id, orders.quantity 
+        FROM orders 
+        JOIN suppliers ON orders.supplier_id = suppliers.id
+        """
+        return db.fetchall(query)
+
+    @staticmethod
+    def find_order_by_id(db, order_id):
+        query = "SELECT * FROM orders WHERE id = ?"
+        return db.fetchone(query, (order_id,))
+
+    @staticmethod
+    def update_order_status(db, order_id, new_status):
+        query = "UPDATE orders SET status = ? WHERE id = ?"
+        db.execute(query, (new_status, order_id))
+
+    @staticmethod
+    def delete_order(db, order_id):
+        query = "DELETE FROM orders WHERE id = ?"
+        db.execute(query, (order_id,))

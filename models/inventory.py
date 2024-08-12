@@ -13,6 +13,10 @@ class Inventory:
         except Exception as e:
             print(f"Error removing book: {e}")
 
+    def remove_book_by_id(self, book_id):
+            query = "DELETE FROM books WHERE id = ?"
+            self.db.execute(query, (book_id,))
+
     def search_book(self, title):
         return Book.find_by_title(self.db, title)
 
@@ -23,8 +27,5 @@ class Inventory:
             print(f"Error updating stock: {e}")
 
     def get_all_books(self):
-        try:
-            return self.db.fetchall("SELECT title, author, genre, price, SUM(stock_quantity) as stock_quantity FROM books GROUP BY title, author, genre, price")
-        except Exception as e:
-            print(f"Error fetching books: {e}")
-            return []
+        query = "SELECT id, title, author, genre, price, stock_quantity FROM books"
+        return self.db.fetchall(query)

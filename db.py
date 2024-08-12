@@ -76,5 +76,38 @@ class Database:
             )
         """)
 
+
+    def get_sales_data(self, start_date, end_date):
+        query = """
+        SELECT 
+            sales.date,
+            books.title,
+            sale_books.quantity,
+            (sale_books.quantity * books.price) AS total_amount
+        FROM 
+            sales
+        JOIN 
+            sale_books ON sales.id = sale_books.sale_id
+        JOIN 
+            books ON sale_books.book_id = books.id
+        WHERE 
+            sales.date BETWEEN ? AND ?
+        ORDER BY 
+            sales.date ASC
+        """
+        return self.fetchall(query, (start_date, end_date))
+
+    def get_total_sales_summary(self, start_date, end_date):
+        query = """
+        SELECT 
+            COUNT(sales.id) as transaction_count, 
+            SUM(sales.total_amount) as total_revenue
+        FROM 
+            sales
+        WHERE 
+            sales.date BETWEEN ? AND ?
+        """
+        return self.fetchone(query, (start_date, end_date))
+
     def close(self):
         self.connection.close()

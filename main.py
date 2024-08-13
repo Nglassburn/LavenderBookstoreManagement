@@ -16,6 +16,7 @@ def main():
     book1 = Book("Book 1", "Author 1", "Genre 1", 20.0, 10)
     book2 = Book("Book 2", "Author 2", "Genre 2", 15.0, 5)
     customer1 = Customer("Customer 1", "customer1@example.com", "Address 1")
+    customer1 = Customer("Bravo", "Space9", "Moon")
     supplier1 = Supplier("Supplier 1", "supplier1@example.com", "Supplier Address 1")
 
     try:

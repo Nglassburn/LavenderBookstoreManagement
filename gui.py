@@ -1,10 +1,10 @@
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
+from db import Database
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
 import pandas as pd
-from db import Database
 from models.book import Book
 from models.customer import Customer
 from models.supplier import Supplier
@@ -20,17 +20,61 @@ class BookstoreApp:
         self.db = Database('data/bookstore.db')
         self.inventory = Inventory(self.db)
         self.book_dict = {}  # Dictionary to store book titles and their IDs
+        self.style = ttk.Style()  # For styling elements
 
         # Create the notebook
         self.notebook = ttk.Notebook(root)
         self.notebook.pack(expand=True, fill='both')
 
-        # Add tabs
+        # Create tabs
+        self.create_home_tab()
         self.create_inventory_tab()
         self.create_customer_tab()
         self.create_supplier_tab()
         self.create_sales_tab()
         self.create_order_tab()
+
+    def create_home_tab(self):
+        self.home_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.home_tab, text='Home')
+
+        # Welcome message
+        welcome_label = ttk.Label(self.home_tab, text="Welcome to the Lavender Bookstore Management System!", font=('Helvetica', 16))
+        welcome_label.pack(pady=20)
+
+        # Navigation buttons
+        button_frame = ttk.Frame(self.home_tab)
+        button_frame.pack(pady=10)
+
+        inventory_button = ttk.Button(button_frame, text="Inventory Management", command=self.show_inventory_tab)
+        inventory_button.grid(row=0, column=0, padx=10, pady=10)
+
+        sales_button = ttk.Button(button_frame, text="Sales Report", command=self.show_sales_tab)
+        sales_button.grid(row=0, column=1, padx=10, pady=10)
+
+        order_button = ttk.Button(button_frame, text="Order Management", command=self.show_order_tab)
+        order_button.grid(row=1, column=0, padx=10, pady=10)
+
+        customer_button = ttk.Button(button_frame, text="Customer Management", command=self.show_customer_tab)
+        customer_button.grid(row=1, column=1, padx=10, pady=10)
+
+        supplier_button = ttk.Button(button_frame, text="Supplier Management", command=self.show_supplier_tab)
+        supplier_button.grid(row=2, column=0, padx=10, pady=10)
+
+        # Quick Stats
+        stats_frame = ttk.Frame(self.home_tab)
+        stats_frame.pack(pady=20)
+
+        # Example of quick stats
+        total_books_label = ttk.Label(stats_frame, text="Total Books in Stock: 100")  # Replace with actual dynamic data
+        total_books_label.pack(pady=5)
+
+        total_sales_label = ttk.Label(stats_frame, text="Total Sales Today: $500")  # Replace with actual dynamic data
+        total_sales_label.pack(pady=5)
+
+        # Logout button
+        logout_button = ttk.Button(self.home_tab, text="Logout", command=self.logout)
+        logout_button.pack(side='bottom', pady=20)
 
     def create_inventory_tab(self):
         self.inventory_tab = ttk.Frame(self.notebook)
@@ -107,16 +151,13 @@ class BookstoreApp:
         price = float(self.price_entry.get())
         stock_quantity = int(self.stock_entry.get())
 
-        # Check if the book already exists
         existing_book = self.db.fetchone("SELECT id, stock_quantity FROM books WHERE title = ? AND author = ?", (title, author))
         
         if existing_book:
-            # Update the stock quantity for the existing book
             new_quantity = existing_book[1] + stock_quantity
             self.db.execute("UPDATE books SET stock_quantity = ? WHERE id = ?", (new_quantity, existing_book[0]))
             messagebox.showinfo("Success", "Book already exists. Stock quantity updated!")
         else:
-            # Add a new book entry
             self.db.execute(
                 "INSERT INTO books (title, author, genre, price, stock_quantity) VALUES (?, ?, ?, ?, ?)",
                 (title, author, genre, price, stock_quantity)
@@ -140,8 +181,10 @@ class BookstoreApp:
         price = float(self.price_entry.get())
         stock_quantity = int(self.stock_entry.get())
 
-        book = Book(title, author, genre, price, stock_quantity, book_id)
-        self.inventory.update_stock(book.title, book.stock_quantity)
+        self.db.execute(
+            "UPDATE books SET title = ?, author = ?, genre = ?, price = ?, stock_quantity = ? WHERE id = ?",
+            (title, author, genre, price, stock_quantity, book_id)
+        )
 
         messagebox.showinfo("Success", "Book updated successfully!")
         self.refresh_inventory()
@@ -153,9 +196,9 @@ class BookstoreApp:
             return
 
         item = self.inventory_tree.item(selected_item)
-        book_id = item['values'][0]  # Get the unique ID of the selected book
+        book_id = item['values'][0]
 
-        self.inventory.remove_book_by_id(book_id)  # Delete based on ID, not title
+        self.inventory.remove_book_by_id(book_id)
         messagebox.showinfo("Success", "Book deleted successfully!")
         self.refresh_inventory()
 
@@ -284,6 +327,167 @@ class BookstoreApp:
         messagebox.showinfo("Success", "Supplier added successfully!")
         self.refresh_suppliers()
 
+    def create_sales_tab(self):
+        self.sales_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.sales_tab, text='Sales Report')
+
+        # Header Section
+        header_frame = ttk.Frame(self.sales_tab)
+        header_frame.pack(pady=10)
+
+        # Title
+        title_label = ttk.Label(header_frame, text="Sales Report", font=('Helvetica', 24, 'bold'))
+        title_label.pack(pady=10)
+
+        # Date Range Selector
+        date_range_frame = ttk.Frame(header_frame)
+        date_range_frame.pack()
+
+        date_range_label = ttk.Label(date_range_frame, text="Date Range:", font=('Helvetica', 12))
+        date_range_label.pack(side='left', padx=5)
+
+        self.date_range_combobox = ttk.Combobox(date_range_frame, values=["Today", "Last 7 Days", "This Month", "Custom Range"])
+        self.date_range_combobox.current(0)
+        self.date_range_combobox.pack(side='left', padx=5)
+
+        # Generate Report Button
+        generate_report_button = ttk.Button(header_frame, text="Generate Report", command=self.generate_sales_report)
+        generate_report_button.pack(pady=10)
+        generate_report_button.configure(style="TButton")
+        # Style the button with lavender color
+        self.style.configure("TButton", background='#E6E6FA', foreground='black', font=('Helvetica', 12, 'bold'))
+        self.style.map("TButton", background=[("active", "#D8BFD8")])  # Lighter lavender on hover
+
+        # Summary Section
+        summary_frame = ttk.Frame(self.sales_tab)
+        summary_frame.pack(pady=10)
+
+        # Total Sales
+        self.total_sales_label = ttk.Label(summary_frame, text="Total Sales: $0.00", font=('Helvetica', 16, 'bold'))
+        self.total_sales_label.pack(pady=5)
+
+        # Number of Transactions
+        self.transactions_label = ttk.Label(summary_frame, text="Transactions: 0", font=('Helvetica', 16, 'bold'))
+        self.transactions_label.pack(pady=5)
+
+        # Chart Section
+        self.chart_frame = ttk.Frame(self.sales_tab)
+        self.chart_frame.pack(fill="both", expand=True, pady=10)
+
+        # Create a placeholder for the chart (actual plotting will be done later)
+        self.plot_sales_over_time([])
+
+        # Detailed Sales Table
+        self.sales_tree = ttk.Treeview(self.sales_tab, columns=("Date", "Book Title", "Quantity", "Total Amount"), show='headings')
+        self.sales_tree.heading("Date", text="Date")
+        self.sales_tree.heading("Book Title", text="Book Title")
+        self.sales_tree.heading("Quantity", text="Quantity")
+        self.sales_tree.heading("Total Amount", text="Total Amount")
+
+        self.sales_tree.pack(fill="both", expand=True, pady=10)
+
+        # Make columns sortable
+        for col in self.sales_tree["columns"]:
+            self.sales_tree.heading(col, text=col, command=lambda _col=col: self.sort_sales_table(_col))
+
+        # Search bar
+        search_frame = ttk.Frame(self.sales_tab)
+        search_frame.pack(pady=10)
+        search_label = ttk.Label(search_frame, text="Search:")
+        search_label.pack(side="left", padx=5)
+        self.search_entry = ttk.Entry(search_frame)
+        self.search_entry.pack(side="left", padx=5)
+        search_button = ttk.Button(search_frame, text="Search", command=self.search_sales_table)
+        search_button.pack(side="left", padx=5)
+
+        # Export Button
+        self.create_export_button()
+
+    def plot_sales_over_time(self, sales_data):
+        # Prepare data for plotting
+        df = pd.DataFrame(sales_data, columns=["Date", "Book Title", "Quantity", "Total Amount"])
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.groupby("Date")["Total Amount"].sum().reset_index()
+
+        # Create the plot with animations
+        fig, ax = plt.subplots()
+        ax.plot(df["Date"], df["Total Amount"], marker="o", color='#8A2BE2')  # Lavender color
+        ax.set_title("Sales Over Time", fontdict={'fontsize': 16, 'fontweight': 'bold'})
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Total Sales ($)")
+        ax.grid(True)
+
+        # Display the plot in the Tkinter GUI
+        for widget in self.chart_frame.winfo_children():
+            widget.destroy()  # Clear any previous chart
+        canvas = FigureCanvasTkAgg(fig, master=self.chart_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
+
+    def generate_sales_report(self):
+        # Determine the date range based on user selection
+        date_range = self.date_range_combobox.get()
+        if date_range == "Today":
+            start_date = end_date = datetime.today().date()
+        elif date_range == "Last 7 Days":
+            end_date = datetime.today().date()
+            start_date = end_date - timedelta(days=7)
+        elif date_range == "This Month":
+            end_date = datetime.today().date()
+            start_date = end_date.replace(day=1)
+        else:
+            start_date, end_date = self.select_custom_date_range()
+
+        # Fetch sales data and summary
+        sales_data = self.db.get_sales_data(start_date, end_date)
+        summary = self.db.get_total_sales_summary(start_date, end_date)
+
+        # Update summary labels with correct tuple indexing
+        self.total_sales_label.config(text=f"Total Sales: ${summary[1]:.2f}")
+        self.transactions_label.config(text=f"Transactions: {summary[0]}")
+
+        # Update the sales table
+        for item in self.sales_tree.get_children():
+            self.sales_tree.delete(item)
+        for sale in sales_data:
+            self.sales_tree.insert('', 'end', values=sale)
+
+        # Plot sales over time
+        self.plot_sales_over_time(sales_data)
+
+    def sort_sales_table(self, col):
+        # Get data from the treeview and sort it
+        data = [(self.sales_tree.set(child, col), child) for child in self.sales_tree.get_children('')]
+        data.sort(reverse=self.sales_tree.heading(col, "command") == "DESC")
+
+        for index, (_, child) in enumerate(data):
+            self.sales_tree.move(child, '', index)
+
+        self.sales_tree.heading(col, command=lambda: self.sort_sales_table(col))
+
+    def search_sales_table(self):
+        query = self.search_entry.get()
+        for item in self.sales_tree.get_children():
+            self.sales_tree.delete(item)
+        sales = self.db.fetchall(f"SELECT * FROM sales WHERE book_title LIKE '%{query}%'")
+        for sale in sales:
+            self.sales_tree.insert('', 'end', values=sale)
+
+    def create_export_button(self):
+        export_button = ttk.Button(self.sales_tab, text="Export Report", command=self.export_report)
+        export_button.pack(pady=10)
+        export_button.configure(style="TButton")
+
+    def export_report(self):
+        # Implement export functionality (e.g., export to CSV)
+        pass
+
+    def select_custom_date_range(self):
+        # Implement a custom date range selector (for simplicity, return a static range)
+        start_date = datetime.today().date() - timedelta(days=30)
+        end_date = datetime.today().date()
+        return start_date, end_date
+
     def create_order_tab(self):
         self.order_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.order_tab, text='Orders')
@@ -332,6 +536,10 @@ class BookstoreApp:
         self.add_order_button = ttk.Button(self.add_order_frame, text='Add Order', command=self.add_order)
         self.add_order_button.pack()
 
+    def refresh_suppliers_combobox(self):
+        suppliers = Supplier.get_all_suppliers(self.db)
+        self.order_supplier_combobox['values'] = [f"{supplier[0]}: {supplier[1]}" for supplier in suppliers]
+
     def refresh_orders(self):
         for item in self.order_tree.get_children():
             self.order_tree.delete(item)
@@ -343,15 +551,14 @@ class BookstoreApp:
         try:
             selected_supplier = self.order_supplier_combobox.get()
             selected_book_title = self.order_book_combobox.get()
-            
             if not selected_supplier or not selected_book_title:
                 raise ValueError("Please select a supplier and a book.")
                 
             supplier_id = int(selected_supplier.split(":")[0].strip())
-            book_id = self.book_dict.get(selected_book_title)
+            book_id = self.book_dict.get(selected_book_title)  # Retrieve the book ID using the selected title
+
             quantity = int(self.order_quantity_entry.get())
 
-            # Creating and saving the order
             order = Order(supplier_id, book_id, quantity)
             order.save_to_db(self.db)
 
@@ -362,188 +569,34 @@ class BookstoreApp:
         except Exception as e:
             messagebox.showerror("Error", f"An unexpected error occurred: {e}")
 
-    def create_sales_tab(self):
-            self.sales_tab = ttk.Frame(self.notebook)
-            self.notebook.add(self.sales_tab, text='Sales Report')
-
-            # Date Range Selector
-            self.date_range_label = ttk.Label(self.sales_tab, text="Date Range:")
-            self.date_range_label.pack(pady=5)
-
-            self.date_range_combobox = ttk.Combobox(self.sales_tab, values=["Today", "Last 7 Days", "This Month", "Custom Range"])
-            self.date_range_combobox.current(0)  # Set default value to "Today"
-            self.date_range_combobox.pack(pady=5)
-
-            self.generate_report_button = ttk.Button(self.sales_tab, text="Generate Report", command=self.generate_sales_report)
-            self.generate_report_button.pack(pady=5)
-
-            # Summary Section
-            self.summary_frame = ttk.Frame(self.sales_tab)
-            self.summary_frame.pack(fill="x", pady=10)
-
-            self.total_sales_label = ttk.Label(self.summary_frame, text="Total Sales: $0.00")
-            self.total_sales_label.pack(side="left", padx=10)
-
-            self.transactions_label = ttk.Label(self.summary_frame, text="Transactions: 0")
-            self.transactions_label.pack(side="left", padx=10)
-
-            # Chart Section
-            self.chart_frame = ttk.Frame(self.sales_tab)
-            self.chart_frame.pack(fill="both", expand=True, pady=10)
-
-            # Detailed Sales Table
-            self.sales_tree = ttk.Treeview(self.sales_tab, columns=("Date", "Book Title", "Quantity", "Total Amount"), show='headings')
-            self.sales_tree.heading("Date", text="Date")
-            self.sales_tree.heading("Book Title", text="Book Title")
-            self.sales_tree.heading("Quantity", text="Quantity")
-            self.sales_tree.heading("Total Amount", text="Total Amount")
-            self.sales_tree.pack(fill="both", expand=True, pady=10)
-
-            self.add_sale_form()
-
-    def add_sale_form(self):
-        self.add_sale_frame = ttk.Frame(self.sales_tab)
-        self.add_sale_frame.pack(side='right', fill='both', expand=True)
-
-        ttk.Label(self.add_sale_frame, text='Customer').pack()
-        self.sale_customer_combobox = ttk.Combobox(self.add_sale_frame)
-        self.sale_customer_combobox.pack()
-        self.refresh_customers_combobox()
-
-        ttk.Label(self.add_sale_frame, text='Book').pack()
-        self.sale_book_combobox = ttk.Combobox(self.add_sale_frame)
-        self.sale_book_combobox.pack()
-        self.refresh_books_comboboxes()
-
-        ttk.Label(self.add_sale_frame, text='Quantity').pack()
-        self.sale_quantity_entry = ttk.Entry(self.add_sale_frame)
-        self.sale_quantity_entry.pack()
-
-        self.add_sale_button = ttk.Button(self.add_sale_frame, text='Add Sale', command=self.add_sale)
-        self.add_sale_button.pack()
-
-    def add_sale(self):
-        try:
-            selected_customer = self.sale_customer_combobox.get()
-            selected_book_title = self.sale_book_combobox.get()
-            quantity = int(self.sale_quantity_entry.get())
-
-            if not selected_customer or not selected_book_title:
-                raise ValueError("Please select a customer and a book.")
-            
-            customer_id = int(selected_customer.split(":")[0].strip())
-            book_id = self.book_dict.get(selected_book_title)
-
-            if book_id is None:
-                raise ValueError("Book not found")
-
-            # Create and record the sale
-            sale = Sale(customer_id)
-            sale.add_book_to_sale(self.db, book_id, quantity)
-            sale.record_sale(self.db)
-
-            messagebox.showinfo("Success", "Sale recorded successfully!")
-            self.refresh_sales()  # Refresh the sales data in the GUI
-        except ValueError as ve:
-            messagebox.showerror("Error", f"Failed to add sale: {ve}")
-        except Exception as e:
-            messagebox.showerror("Error", f"An unexpected error occurred: {e}")
-
-    def refresh_sales(self):
-        # Clear the existing sales in the treeview
-        for item in self.sales_tree.get_children():
-            self.sales_tree.delete(item)
-
-        # Fetch all sales from the database
-        sales = self.get_all_sales()
-
-        # Insert each sale into the sales treeview
-        for sale in sales:
-            self.sales_tree.insert('', 'end', values=sale)
-
-    def get_all_sales(self):
-        query = """
-        SELECT sales.id, customers.name, sales.date, sales.total_amount 
-        FROM sales 
-        JOIN customers ON sales.customer_id = customers.id
-        """
-        return self.db.fetchall(query)
-
-    def generate_sales_report(self):
-        # Determine the date range based on user selection
-        date_range = self.date_range_combobox.get()
-        if date_range == "Today":
-            start_date = end_date = datetime.today().date()
-        elif date_range == "Last 7 Days":
-            end_date = datetime.today().date()
-            start_date = end_date - timedelta(days=7)
-        elif date_range == "This Month":
-            end_date = datetime.today().date()
-            start_date = end_date.replace(day=1)
-        else:
-            start_date, end_date = self.select_custom_date_range()
-
-        # Fetch sales data and summary
-        sales_data = self.db.get_sales_data(start_date, end_date)
-        summary = self.db.get_total_sales_summary(start_date, end_date)
-
-        # Update summary labels
-        self.total_sales_label.config(text=f"Total Sales: ${summary[1]:.2f}")
-        self.transactions_label.config(text=f"Transactions: {summary[0]}")
-
-
-        # Update the sales table
-        for item in self.sales_tree.get_children():
-            self.sales_tree.delete(item)
-        for sale in sales_data:
-            self.sales_tree.insert('', 'end', values=sale)
-
-        # Plot sales over time
-        self.plot_sales_over_time(sales_data)
-
-    def select_custom_date_range(self):
-        # Implement a custom date range selector (for simplicity, return a static range)
-        start_date = datetime.today().date() - timedelta(days=30)
-        end_date = datetime.today().date()
-        return start_date, end_date
-
-    def plot_sales_over_time(self, sales_data):
-        # Prepare data for plotting
-        df = pd.DataFrame(sales_data, columns=["Date", "Book Title", "Quantity", "Total Amount"])
-        df["Date"] = pd.to_datetime(df["Date"])
-        df = df.groupby("Date")["Total Amount"].sum().reset_index()
-
-        # Create the plot
-        fig, ax = plt.subplots()
-        ax.plot(df["Date"], df["Total Amount"], marker="o")
-        ax.set_title("Sales Over Time")
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Total Sales ($)")
-        ax.grid(True)
-
-        # Display the plot in the Tkinter GUI
-        for widget in self.chart_frame.winfo_children():
-            widget.destroy()  # Clear any previous chart
-        canvas = FigureCanvasTkAgg(fig, master=self.chart_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True)
-
-    def refresh_suppliers_combobox(self):
-        suppliers = Supplier.get_all_suppliers(self.db)
-        self.order_supplier_combobox['values'] = [f"{supplier[0]}: {supplier[1]}" for supplier in suppliers]
-
-    def refresh_customers_combobox(self):
-        customers = Customer.get_all_customers(self.db)
-        self.sale_customer_combobox['values'] = [f"{customer[0]}: {customer[1]}" for customer in customers]
-
     def refresh_books_comboboxes(self):
         books = self.inventory.get_all_books()
-        # Ensure book_dict maps titles to IDs correctly
-        self.book_dict = {book[1]: book[0] for book in books}  # book[1] should be the title, and book[0] the ID
-        # Populate the combobox with book titles
-        self.sale_book_combobox['values'] = list(self.book_dict.keys())  # Set combobox values to book titles
-        if hasattr(self, 'order_book_combobox'):
+        self.book_dict = {book[1]: book[0] for book in books}  # Create a dictionary with title as key and ID as value
+        
+        if hasattr(self, 'sale_book_combobox'):  # Ensure sale_book_combobox exists
+            self.sale_book_combobox['values'] = list(self.book_dict.keys())  # Set combobox values to book titles
+
+        if hasattr(self, 'order_book_combobox'):  # Ensure order_book_combobox exists
             self.order_book_combobox['values'] = list(self.book_dict.keys())  # Set combobox values to book titles
+
+    def show_inventory_tab(self):
+        self.notebook.select(self.inventory_tab)
+
+    def show_sales_tab(self):
+        self.notebook.select(self.sales_tab)
+
+    def show_order_tab(self):
+        self.notebook.select(self.order_tab)
+
+    def show_customer_tab(self):
+        self.notebook.select(self.customer_tab)
+
+    def show_supplier_tab(self):
+        self.notebook.select(self.supplier_tab)
+
+    def logout(self):
+        # Implement logout functionality if needed
+        self.root.quit()
 
     def on_closing(self):
         self.db.close()

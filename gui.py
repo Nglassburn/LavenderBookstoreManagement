@@ -30,21 +30,47 @@ class BookstoreApp:
 
         # Create tabs
         self.create_login_tab()
-        self.create_signup_tab()
-        self.create_home_tab()
-        self.create_inventory_tab()
-        self.create_customer_tab()
-        self.create_supplier_tab()
-        self.create_sales_tab()
-        self.create_order_tab()
+        # self.create_signup_tab()
+
+        # tab to be create after successfull login
+
+        # all new tab will be added to login function in the if statement
+            # self.create_home_tab()
+            # self.create_inventory_tab()
+            # self.create_customer_tab()
+            # self.create_supplier_tab()
+            # self.create_sales_tab()
+            # self.create_order_tab()
 
     def create_login_tab(self):
-        self.login_tab = Login(self.notebook)
+        try: 
+            self.notebook.forget(self.signup_tab)
+        except AttributeError:
+            pass
+        self.login_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.login_tab, text="Login")
+
+        # Name label and entry
+        label_username = ttk.Label(self.login_tab, text="username:")
+        label_username.grid(row=0, column=0, padx=10, pady=10, sticky="e")
+
+        self.entry_username = ttk.Entry(self.login_tab)
+        self.entry_username.grid(row=0, column=1, padx=10, pady=10)
+
+        # Email label and entry
+        label_password = ttk.Label(self.login_tab, text="password:")
+        label_password.grid(row=1, column=0, padx=10, pady=10, sticky="e")
+
+        self.entry_password = ttk.Entry(self.login_tab, show='*')
+        self.entry_password.grid(row=1, column=1, padx=10, pady=10)
 
         # Login button
         button_login = ttk.Button(self.login_tab, text="Login", command=self.login)
         button_login.grid(row=2, columnspan=2, pady=20)
+
+        # Sign up button in case the user is register yet
+        button_login = ttk.Button(self.login_tab, text="Or Register", command=self.create_signup_tab)
+        button_login.grid(row=3, columnspan=2, pady=20)
     
     # login function
     def login(self):
@@ -52,8 +78,12 @@ class BookstoreApp:
         password = self.entry_password.get()
         account_exit = self.db.fetchone("SELECT id FROM customers WHERE name = ? AND email = ?", (username, password))
         if account_exit:
-            self.notebook.forget(self.login_tab)
-            self.notebook.forget(self.signup_tab)
+            try:
+                self.notebook.forget(self.login_tab)
+                self.notebook.forget(self.signup_tab)
+            except :
+                pass
+            self.create_home_tab()
             self.create_inventory_tab()
             self.create_customer_tab()
             self.create_supplier_tab()
@@ -62,12 +92,52 @@ class BookstoreApp:
 
             messagebox.showinfo("Login Success", f"Welcome, {username}!")
         else:
-            messagebox.showwarning("Input Error", "Please enter both username and password.")
+            messagebox.showwarning("Input Error", "Please enter the right username and password.")
 
 
     def create_signup_tab(self):
-        self.signup_tab = Register(self.notebook)
+        self.notebook.forget(self.login_tab)
+        self.signup_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.signup_tab, text="Register")
+        # Email Label and Entry
+        self.email_label = ttk.Label(self.signup_tab, text="Email:")
+        self.email_label.grid(row=1, column=0, padx=10, pady=10, sticky="e")
+
+        self.email_entry = ttk.Entry(self.signup_tab)
+        self.email_entry.grid(row=1, column=1, padx=10, pady=10, sticky="e")
+
+        # Password Label and Entry
+        self.password_label = ttk.Label(self.signup_tab, text="Password:")
+        self.password_label.grid(row=2, column=0, padx=10, pady=10, sticky="e")
+
+        self.password_entry = ttk.Entry(self.signup_tab, show="*")
+        self.password_entry.grid(row=2, column=1, padx=10, pady=10, sticky="e")
+
+
+        # Confirm Password Label and Entry
+        self.confirmPassword_label = ttk.Label(self.signup_tab, text="Confirm Password:")
+        self.confirmPassword_label.grid(row=3, column=0, padx=10, pady=10, sticky="e")
+
+        self.confirmPassword = ttk.Entry(self.signup_tab, show="*")
+        self.confirmPassword.grid(row=3, column=1, padx=10, pady=10, sticky="e")
+
+        # Sign-Up Button
+        self.signup_button = ttk.Button(self.signup_tab, text="Sign Up", command=self.signup)
+        self.signup_button.grid(row=4, columnspan=2, pady=20)
+
+        # Go back to the login page Button
+        button_login = ttk.Button(self.signup_tab, text="Or Login", command=self.create_login_tab)
+        button_login.grid(row=5, columnspan=2, pady=20)
+
+    def signup(self):
+        # Retrieve the entered data
+        username = self.username_entry.get()
+        email = self.email_entry.get()
+        password = self.password_entry.get()
+
+        # Here you can add code to handle the signup logic
+        self.forget(self.login_tab)
+
     
 
     def create_home_tab(self):
@@ -640,6 +710,13 @@ class BookstoreApp:
 
 if __name__ == "__main__":
     root = tk.Tk()
+
+    # Get the screen width and height
+    screen_width = root.winfo_screenwidth()
+    screen_height = root.winfo_screenheight()
+
+    # Set the geometry of the root window to match the screen size
+    root.geometry(f"{screen_width}x{screen_height}")
     app = BookstoreApp(root)
     root.protocol("WM_DELETE_WINDOW", app.on_closing)
     root.mainloop()

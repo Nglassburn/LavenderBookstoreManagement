@@ -1,5 +1,5 @@
 import tkinter as tk
-from tkinter import ttk, messagebox, filedialog
+from tkinter import ttk, messagebox
 from db import Database
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
@@ -11,14 +11,12 @@ from models.supplier import Supplier
 from models.inventory import Inventory
 from models.sale import Sale
 from models.order import Order
-
 from account import Register, Login
+
 
 class BookstoreApp:
     def __init__(self, root):
         self.root = root
-        self.root.title("Lavender Bookstore Management System")
-
         self.db = Database('data/bookstore.db')
         self.inventory = Inventory(self.db)
         self.book_dict = {}  # Dictionary to store book titles and their IDs
@@ -30,75 +28,63 @@ class BookstoreApp:
 
         # Create tabs
         self.create_login_tab()
-        # self.create_signup_tab()
-
-        # tab to be create after successfull login
-
-        # all new tab will be added to login function in the if statement
-            # self.create_home_tab()
-            # self.create_inventory_tab()
-            # self.create_customer_tab()
-            # self.create_supplier_tab()
-            # self.create_sales_tab()
-            # self.create_order_tab()
+        self.create_book_tab()
+        #self.create_home_tab()
+        #self.create_inventory_tab()
+        #self.create_customer_tab()
+        #self.create_supplier_tab()
+        #self.create_sales_tab()
+        #self.create_order_tab()
 
     def create_login_tab(self):
-        try: 
-            self.notebook.forget(self.signup_tab)
-        except AttributeError:
-            pass
-        self.login_tab = ttk.Frame(self.notebook)
-        self.notebook.add(self.login_tab, text="Login")
+            self.login_tab = ttk.Frame(self.notebook)
+            self.notebook.add(self.login_tab, text="Login")
 
-        # Name label and entry
-        label_username = ttk.Label(self.login_tab, text="username:")
-        label_username.grid(row=0, column=0, padx=10, pady=10, sticky="e")
+            # Username and password fields
+            label_username = ttk.Label(self.login_tab, text="Username:")
+            label_username.grid(row=0, column=0, padx=10, pady=10, sticky="e")
+            self.entry_username = ttk.Entry(self.login_tab)
+            self.entry_username.grid(row=0, column=1, padx=10, pady=10)
 
-        self.entry_username = ttk.Entry(self.login_tab)
-        self.entry_username.grid(row=0, column=1, padx=10, pady=10)
+            label_password = ttk.Label(self.login_tab, text="Password:")
+            label_password.grid(row=1, column=0, padx=10, pady=10, sticky="e")
+            self.entry_password = ttk.Entry(self.login_tab, show='*')
+            self.entry_password.grid(row=1, column=1, padx=10, pady=10)
 
-        # Email label and entry
-        label_password = ttk.Label(self.login_tab, text="password:")
-        label_password.grid(row=1, column=0, padx=10, pady=10, sticky="e")
+            # Login button
+            button_login = ttk.Button(self.login_tab, text="Login", command=self.login)
+            button_login.grid(row=2, columnspan=2, pady=20)
 
-        self.entry_password = ttk.Entry(self.login_tab, show='*')
-        self.entry_password.grid(row=1, column=1, padx=10, pady=10)
-
-        # Login button
-        button_login = ttk.Button(self.login_tab, text="Login", command=self.login)
-        button_login.grid(row=2, columnspan=2, pady=20)
-
-        # Sign up button in case the user is register yet
-        button_login = ttk.Button(self.login_tab, text="Or Register", command=self.create_signup_tab)
-        button_login.grid(row=3, columnspan=2, pady=20)
-    
-    # login function
     def login(self):
-        username = self.entry_username.get()
-        password = self.entry_password.get()
-        account_exit = self.db.fetchone("SELECT id FROM customers WHERE name = ? AND email = ?", (username, password))
-        if account_exit:
-            try:
+            username = self.entry_username.get()
+            password = self.entry_password.get()
+            user = self.db.fetchone("SELECT id, role FROM customers WHERE name = ? AND password = ?", (username, password))
+
+            if user:
+                self.current_user_role = user[1]
                 self.notebook.forget(self.login_tab)
-                self.notebook.forget(self.signup_tab)
-            except :
-                pass
-            self.create_home_tab()
-            self.create_inventory_tab()
-            self.create_customer_tab()
-            self.create_supplier_tab()
-            self.create_sales_tab()
-            self.create_order_tab()
 
-            messagebox.showinfo("Login Success", f"Welcome, {username}!")
-        else:
-            messagebox.showwarning("Input Error", "Please enter the right username and password.")
+                # Ensure no duplicate tabs
+                if hasattr(self, 'home_tab') and self.notebook.index("end") > 0:
+                    self.notebook.forget(self.home_tab)
 
+                # Create necessary tabs based on user role
+                self.create_home_tab()
+                if self.current_user_role == 'admin':
+                    self.create_inventory_tab()
+                    self.create_customer_tab()
+                    self.create_supplier_tab()
+                    self.create_sales_tab()
+                    self.create_order_tab()
+
+                messagebox.showinfo("Login Success", f"Welcome, {username}!")
+            else:
+                messagebox.showwarning("Input Error", "Please enter the correct username and password.")
 
     def create_signup_tab(self):
-        self.notebook.forget(self.login_tab)
-        self.signup_tab = ttk.Frame(self.notebook)
+        self.signup_tab = Register(self.notebook)
         self.notebook.add(self.signup_tab, text="Register")
+        self.signup_tab = ttk.Frame(self.notebook)
         # Email Label and Entry
         self.email_label = ttk.Label(self.signup_tab, text="Email:")
         self.email_label.grid(row=1, column=0, padx=10, pady=10, sticky="e")
@@ -112,7 +98,6 @@ class BookstoreApp:
 
         self.password_entry = ttk.Entry(self.signup_tab, show="*")
         self.password_entry.grid(row=2, column=1, padx=10, pady=10, sticky="e")
-
 
         # Confirm Password Label and Entry
         self.confirmPassword_label = ttk.Label(self.signup_tab, text="Confirm Password:")
@@ -130,15 +115,17 @@ class BookstoreApp:
         button_login.grid(row=5, columnspan=2, pady=20)
 
     def signup(self):
-        # Retrieve the entered data
         username = self.username_entry.get()
         email = self.email_entry.get()
         password = self.password_entry.get()
+        role = 'admin' if self.role_var.get() else 'user'  # Assuming you have a checkbox or dropdown for role
 
-        # Here you can add code to handle the signup logic
-        self.forget(self.login_tab)
-
-    
+        self.db.execute(
+            "INSERT INTO customers (name, email, address, role) VALUES (?, ?, ?, ?)",
+            (username, email, 'Default Address', role)
+        )
+        messagebox.showinfo("Success", f"Account created for {role}!")
+        self.create_login_tab()
 
     def create_home_tab(self):
         self.home_tab = ttk.Frame(self.notebook)
@@ -181,6 +168,36 @@ class BookstoreApp:
         # Logout button
         logout_button = ttk.Button(self.home_tab, text="Logout", command=self.logout)
         logout_button.pack(side='bottom', pady=20)
+
+    def create_book_tab(self):
+        self.book_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.book_tab, text='Books')
+
+        # Create a treeview to display the list of available books
+        self.book_tree = ttk.Treeview(self.book_tab, columns=("ID", "Title", "Author", "Genre", "Price", "Stock"), show='headings')
+        self.book_tree.heading("ID", text="ID")
+        self.book_tree.heading("Title", text="Title")
+        self.book_tree.heading("Author", text="Author")
+        self.book_tree.heading("Genre", text="Genre")
+        self.book_tree.heading("Price", text="Price")
+        self.book_tree.heading("Stock", text="Stock Quantity")
+        self.book_tree.pack(side='left', fill='both', expand=True)
+
+        # Create a scrollbar
+        book_scrollbar = ttk.Scrollbar(self.book_tab, orient='vertical', command=self.book_tree.yview)
+        book_scrollbar.pack(side='left', fill='y')
+
+        self.book_tree.config(yscrollcommand=book_scrollbar.set)
+
+        # Populate the treeview with book data
+        self.refresh_book_list()
+
+    def refresh_book_list(self):
+        for item in self.book_tree.get_children():
+            self.book_tree.delete(item)
+        books = self.inventory.get_all_books()
+        for book in books:
+            self.book_tree.insert('', 'end', values=book)
 
     def create_inventory_tab(self):
         self.inventory_tab = ttk.Frame(self.notebook)
@@ -257,19 +274,22 @@ class BookstoreApp:
         price = float(self.price_entry.get())
         stock_quantity = int(self.stock_entry.get())
 
+        # Check if the book already exists
         existing_book = self.db.fetchone("SELECT id, stock_quantity FROM books WHERE title = ? AND author = ?", (title, author))
         
         if existing_book:
+            # Update the stock quantity for the existing book
             new_quantity = existing_book[1] + stock_quantity
             self.db.execute("UPDATE books SET stock_quantity = ? WHERE id = ?", (new_quantity, existing_book[0]))
             messagebox.showinfo("Success", "Book already exists. Stock quantity updated!")
         else:
+            # Add a new book entry
             self.db.execute(
                 "INSERT INTO books (title, author, genre, price, stock_quantity) VALUES (?, ?, ?, ?, ?)",
                 (title, author, genre, price, stock_quantity)
             )
-            messagebox.showinfo("Success", "New book added to the inventory!")
-        
+            messagebox.showinfo("Success", "Book added successfully!")
+
         self.refresh_inventory()
 
     def update_book(self):
@@ -287,6 +307,7 @@ class BookstoreApp:
         price = float(self.price_entry.get())
         stock_quantity = int(self.stock_entry.get())
 
+        book = Book(title, author, genre, price, stock_quantity, book_id)
         self.db.execute(
             "UPDATE books SET title = ?, author = ?, genre = ?, price = ?, stock_quantity = ? WHERE id = ?",
             (title, author, genre, price, stock_quantity, book_id)
@@ -304,7 +325,7 @@ class BookstoreApp:
         item = self.inventory_tree.item(selected_item)
         book_id = item['values'][0]
 
-        self.inventory.remove_book_by_id(book_id)
+        self.inventory.remove_book_by_id(book_id)  # Delete based on ID, not title
         messagebox.showinfo("Success", "Book deleted successfully!")
         self.refresh_inventory()
 
@@ -657,11 +678,13 @@ class BookstoreApp:
         try:
             selected_supplier = self.order_supplier_combobox.get()
             selected_book_title = self.order_book_combobox.get()
+            print(f"Selected Supplier: {selected_supplier}, Selected Book Title: {selected_book_title}")
             if not selected_supplier or not selected_book_title:
                 raise ValueError("Please select a supplier and a book.")
                 
             supplier_id = int(selected_supplier.split(":")[0].strip())
             book_id = self.book_dict.get(selected_book_title)  # Retrieve the book ID using the selected title
+            print(f"Parsed Supplier ID: {supplier_id}, Retrieved Book ID: {book_id}")
 
             quantity = int(self.order_quantity_entry.get())
 
@@ -684,6 +707,14 @@ class BookstoreApp:
 
         if hasattr(self, 'order_book_combobox'):  # Ensure order_book_combobox exists
             self.order_book_combobox['values'] = list(self.book_dict.keys())  # Set combobox values to book titles
+
+    def refresh_suppliers_combobox(self):
+        suppliers = Supplier.get_all_suppliers(self.db)
+        self.order_supplier_combobox['values'] = [f"{supplier[0]}: {supplier[1]}" for supplier in suppliers]
+
+    def refresh_customers_combobox(self):
+        customers = Customer.get_all_customers(self.db)
+        self.sale_customer_combobox['values'] = [f"{customer[0]}: {customer[1]}" for customer in customers]
 
     def show_inventory_tab(self):
         self.notebook.select(self.inventory_tab)

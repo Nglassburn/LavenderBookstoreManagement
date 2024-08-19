@@ -12,6 +12,8 @@ from models.inventory import Inventory
 from models.sale import Sale
 from models.order import Order
 
+from account import Register, Login
+
 class BookstoreApp:
     def __init__(self, root):
         self.root = root
@@ -27,12 +29,46 @@ class BookstoreApp:
         self.notebook.pack(expand=True, fill='both')
 
         # Create tabs
+        self.create_login_tab()
+        self.create_signup_tab()
         self.create_home_tab()
         self.create_inventory_tab()
         self.create_customer_tab()
         self.create_supplier_tab()
         self.create_sales_tab()
         self.create_order_tab()
+
+    def create_login_tab(self):
+        self.login_tab = Login(self.notebook)
+        self.notebook.add(self.login_tab, text="Login")
+
+        # Login button
+        button_login = ttk.Button(self.login_tab, text="Login", command=self.login)
+        button_login.grid(row=2, columnspan=2, pady=20)
+    
+    # login function
+    def login(self):
+        username = self.entry_username.get()
+        password = self.entry_password.get()
+        account_exit = self.db.fetchone("SELECT id FROM customers WHERE name = ? AND email = ?", (username, password))
+        if account_exit:
+            self.notebook.forget(self.login_tab)
+            self.notebook.forget(self.signup_tab)
+            self.create_inventory_tab()
+            self.create_customer_tab()
+            self.create_supplier_tab()
+            self.create_sales_tab()
+            self.create_order_tab()
+
+            messagebox.showinfo("Login Success", f"Welcome, {username}!")
+        else:
+            messagebox.showwarning("Input Error", "Please enter both username and password.")
+
+
+    def create_signup_tab(self):
+        self.signup_tab = Register(self.notebook)
+        self.notebook.add(self.signup_tab, text="Register")
+    
 
     def create_home_tab(self):
         self.home_tab = ttk.Frame(self.notebook)

@@ -1,2 +1,3 @@
-__pycache*
-data/bookstore.db
+__pycache__
+trash
+

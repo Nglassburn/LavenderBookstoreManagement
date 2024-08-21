@@ -21,6 +21,7 @@ class BookstoreApp:
         self.inventory = Inventory(self.db)
         self.book_dict = {}  # Dictionary to store book titles and their IDs
         self.style = ttk.Style()  # For styling elements
+        self.current_user_id = None #Initialize current_user_id
 
         # Create the notebook
         self.notebook = ttk.Notebook(root)
@@ -28,7 +29,7 @@ class BookstoreApp:
 
         # Create tabs
         self.create_login_tab()
-        self.create_book_tab()
+        #self.create_book_catalog_tab()
         #self.create_home_tab()
         #self.create_inventory_tab()
         #self.create_customer_tab()
@@ -55,31 +56,35 @@ class BookstoreApp:
             button_login = ttk.Button(self.login_tab, text="Login", command=self.login)
             button_login.grid(row=2, columnspan=2, pady=20)
 
+            # Sign up button
+            button_signup = ttk.Button(self.login_tab, text="Sign Up", command=self.create_signup_tab)
+            button_signup.grid(row=3, columnspan=2, pady=10)
+
     def login(self):
-            username = self.entry_username.get()
-            password = self.entry_password.get()
-            user = self.db.fetchone("SELECT id, role FROM customers WHERE name = ? AND password = ?", (username, password))
+        username = self.entry_username.get()
+        password = self.entry_password.get()
+        
+        # Correct the query to check the password, not the email
+        user = self.db.fetchone("SELECT id, role FROM customers WHERE name = ? AND password = ?", (username, password))
+        
+        if user:
+            self.current_user_id = user[0]  # Set the current user ID
+            role = user[1]  # Get the role of the user
 
-            if user:
-                self.current_user_role = user[1]
-                self.notebook.forget(self.login_tab)
-
-                # Ensure no duplicate tabs
-                if hasattr(self, 'home_tab') and self.notebook.index("end") > 0:
-                    self.notebook.forget(self.home_tab)
-
-                # Create necessary tabs based on user role
+            # Hide or show tabs based on role
+            if role == 'admin':
                 self.create_home_tab()
-                if self.current_user_role == 'admin':
-                    self.create_inventory_tab()
-                    self.create_customer_tab()
-                    self.create_supplier_tab()
-                    self.create_sales_tab()
-                    self.create_order_tab()
-
-                messagebox.showinfo("Login Success", f"Welcome, {username}!")
+                self.create_inventory_tab()
+                self.create_customer_tab()
+                self.create_supplier_tab()
+                self.create_sales_tab()
+                self.create_order_tab()
             else:
-                messagebox.showwarning("Input Error", "Please enter the correct username and password.")
+                self.create_book_catalog_tab()
+
+            messagebox.showinfo("Login Success", f"Welcome, {username}!")
+        else:
+            messagebox.showwarning("Input Error", "Please enter the correct username and password.")
 
     def create_signup_tab(self):
         self.signup_tab = Register(self.notebook)
@@ -169,35 +174,52 @@ class BookstoreApp:
         logout_button = ttk.Button(self.home_tab, text="Logout", command=self.logout)
         logout_button.pack(side='bottom', pady=20)
 
-    def create_book_tab(self):
-        self.book_tab = ttk.Frame(self.notebook)
-        self.notebook.add(self.book_tab, text='Books')
+    def create_book_catalog_tab(self):
+        self.book_catalog_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.book_catalog_tab, text='Book Catalog')
 
-        # Create a treeview to display the list of available books
-        self.book_tree = ttk.Treeview(self.book_tab, columns=("ID", "Title", "Author", "Genre", "Price", "Stock"), show='headings')
-        self.book_tree.heading("ID", text="ID")
-        self.book_tree.heading("Title", text="Title")
-        self.book_tree.heading("Author", text="Author")
-        self.book_tree.heading("Genre", text="Genre")
-        self.book_tree.heading("Price", text="Price")
-        self.book_tree.heading("Stock", text="Stock Quantity")
-        self.book_tree.pack(side='left', fill='both', expand=True)
+        # Treeview for displaying books
+        self.book_catalog_tree = ttk.Treeview(self.book_catalog_tab, columns=("ID", "Title", "Author", "Genre", "Price"), show='headings')
+        self.book_catalog_tree.heading("ID", text="ID")
+        self.book_catalog_tree.heading("Title", text="Title")
+        self.book_catalog_tree.heading("Author", text="Author")
+        self.book_catalog_tree.heading("Genre", text="Genre")
+        self.book_catalog_tree.heading("Price", text="Price")
+        self.book_catalog_tree.pack(side='left', fill='both', expand=True)
 
-        # Create a scrollbar
-        book_scrollbar = ttk.Scrollbar(self.book_tab, orient='vertical', command=self.book_tree.yview)
-        book_scrollbar.pack(side='left', fill='y')
+        # Purchase Button
+        self.purchase_button = ttk.Button(self.book_catalog_tab, text='Purchase', command=self.purchase_book)
+        self.purchase_button.pack(side='right', fill='x')
 
-        self.book_tree.config(yscrollcommand=book_scrollbar.set)
+        # Refresh the catalog
+        self.refresh_book_catalog()
 
-        # Populate the treeview with book data
-        self.refresh_book_list()
-
-    def refresh_book_list(self):
-        for item in self.book_tree.get_children():
-            self.book_tree.delete(item)
+    def refresh_book_catalog(self):
+        for item in self.book_catalog_tree.get_children():
+            self.book_catalog_tree.delete(item)
         books = self.inventory.get_all_books()
         for book in books:
-            self.book_tree.insert('', 'end', values=book)
+            self.book_catalog_tree.insert('', 'end', values=(book[0], book[1], book[2], book[3], book[4]))
+
+    def purchase_book(self):
+        selected_item = self.book_catalog_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Warning", "No book selected")
+            return
+
+        item = self.book_catalog_tree.item(selected_item)
+        book_id = item['values'][0]
+        quantity = 1  # Or allow users to select quantity
+
+        # Process the purchase (you'll need to tie this into your existing sale logic)
+        try:
+            sale = Sale(customer_id=self.current_user_id)
+            sale.add_book_to_sale(self.db, book_id, quantity)
+            sale.record_sale(self.db)
+            messagebox.showinfo("Success", "Purchase successful!")
+        except Exception as e:
+            messagebox.showerror("Error", f"An unexpected error occurred: {e}")
+
 
     def create_inventory_tab(self):
         self.inventory_tab = ttk.Frame(self.notebook)
@@ -390,6 +412,34 @@ class BookstoreApp:
 
         messagebox.showinfo("Success", "Customer added successfully!")
         self.refresh_customers()
+
+    def add_sale(self):
+        try:
+            selected_customer = self.sale_customer_combobox.get()
+            selected_book_title = self.sale_book_combobox.get()
+            quantity = int(self.sale_quantity_entry.get())
+
+            if not selected_customer or not selected_book_title:
+                raise ValueError("Please select a customer and a book.")
+            
+            customer_id = int(selected_customer.split(":")[0].strip())
+            book_id = self.book_dict.get(selected_book_title)
+
+            if book_id is None:
+                raise ValueError("Book not found")
+
+            # Create and record the sale
+            sale = Sale(customer_id)
+            sale.add_book_to_sale(self.db, book_id, quantity)
+            sale.record_sale(self.db)
+
+            messagebox.showinfo("Success", "Sale recorded successfully!")
+            self.refresh_sales()  # Refresh the sales data in the GUI
+        except ValueError as ve:
+            messagebox.showerror("Error", f"Failed to add sale: {ve}")
+        except Exception as e:
+            messagebox.showerror("Error", f"An unexpected error occurred: {e}")
+
 
     def create_supplier_tab(self):
         self.supplier_tab = ttk.Frame(self.notebook)

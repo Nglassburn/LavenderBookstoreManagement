@@ -12,6 +12,11 @@ from models.inventory import Inventory
 from models.sale import Sale
 from models.order import Order
 from account import Register, Login
+import secrets
+import smtplib
+from email.mime.text import MIMEText
+from datetime import datetime, timedelta
+import bcrypt
 
 
 class BookstoreApp:
@@ -29,13 +34,10 @@ class BookstoreApp:
 
         # Create tabs
         self.create_login_tab()
-        #self.create_book_catalog_tab()
-        #self.create_home_tab()
-        #self.create_inventory_tab()
-        #self.create_customer_tab()
-        #self.create_supplier_tab()
-        #self.create_sales_tab()
-        #self.create_order_tab()
+        self.create_password_reset_request_tab()
+        self.create_checkout_tab()
+
+
 
     def create_login_tab(self):
             self.login_tab = ttk.Frame(self.notebook)
@@ -63,28 +65,33 @@ class BookstoreApp:
     def login(self):
         username = self.entry_username.get()
         password = self.entry_password.get()
-        
-        # Correct the query to check the password, not the email
-        user = self.db.fetchone("SELECT id, role FROM customers WHERE name = ? AND password = ?", (username, password))
+
+        # Fetch the stored hashed password from the database
+        user = self.db.fetchone("SELECT id, password, role FROM customers WHERE name = ?", (username,))
         
         if user:
-            self.current_user_id = user[0]  # Set the current user ID
-            role = user[1]  # Get the role of the user
+            user_id, stored_hashed_password, role = user
+            
+            # Check if the provided password matches the stored hashed password
+            if bcrypt.checkpw(password.encode('utf-8'), stored_hashed_password):
+                self.current_user_id = user_id  # Set the current user ID
 
-            # Hide or show tabs based on role
-            if role == 'admin':
-                self.create_home_tab()
-                self.create_inventory_tab()
-                self.create_customer_tab()
-                self.create_supplier_tab()
-                self.create_sales_tab()
-                self.create_order_tab()
+                # Hide or show tabs based on role
+                if role == 'admin':
+                    self.create_home_tab()
+                    self.create_inventory_tab()
+                    self.create_customer_tab()
+                    self.create_supplier_tab()
+                    self.create_sales_tab()
+                    self.create_order_tab()
+                else:
+                    self.create_book_catalog_tab()
+
+                messagebox.showinfo("Login Success", f"Welcome, {username}!")
             else:
-                self.create_book_catalog_tab()
-
-            messagebox.showinfo("Login Success", f"Welcome, {username}!")
+                messagebox.showwarning("Input Error", "Incorrect password. Please try again.")
         else:
-            messagebox.showwarning("Input Error", "Please enter the correct username and password.")
+            messagebox.showwarning("Input Error", "User not found. Please try again.")
 
     def create_signup_tab(self):
         self.signup_tab = Register(self.notebook)
@@ -123,13 +130,17 @@ class BookstoreApp:
         username = self.username_entry.get()
         email = self.email_entry.get()
         password = self.password_entry.get()
-        role = 'admin' if self.role_var.get() else 'user'  # Assuming you have a checkbox or dropdown for role
 
+        # Hash the password
+        hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
+
+        # Store the hashed password in the database
         self.db.execute(
-            "INSERT INTO customers (name, email, address, role) VALUES (?, ?, ?, ?)",
-            (username, email, 'Default Address', role)
+            "INSERT INTO customers (name, email, password, role) VALUES (?, ?, ?, ?)",
+            (username, email, hashed_password, 'user')  # Adjust 'user' to 'admin' if necessary
         )
-        messagebox.showinfo("Success", f"Account created for {role}!")
+
+        messagebox.showinfo("Success", "Account created successfully!")
         self.create_login_tab()
 
     def create_home_tab(self):
@@ -784,6 +795,147 @@ class BookstoreApp:
     def logout(self):
         # Implement logout functionality if needed
         self.root.quit()
+
+    def create_password_reset_request_tab(self):
+        self.password_reset_request_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.password_reset_request_tab, text="Password Reset")
+
+        # Email label and entry
+        label_email = ttk.Label(self.password_reset_request_tab, text="Email Address:")
+        label_email.grid(row=0, column=0, padx=10, pady=10, sticky="e")
+        self.entry_email = ttk.Entry(self.password_reset_request_tab)
+        self.entry_email.grid(row=0, column=1, padx=10, pady=10)
+
+        # Submit button
+        button_submit = ttk.Button(self.password_reset_request_tab, text="Submit", command=self.submit_password_reset_request)
+        button_submit.grid(row=1, columnspan=2, pady=20)
+
+    def submit_password_reset_request(self):
+        email = self.entry_email.get()
+        
+        # Check if email exists in the database
+        user = self.db.fetchone("SELECT id FROM customers WHERE email = ?", (email,))
+        if not user:
+            messagebox.showerror("Error", "Email not found")
+            return
+
+        # Generate a secure token
+        reset_token = secrets.token_urlsafe(16)
+        reset_token_expiry = (datetime.now() + timedelta(hours=1)).strftime("%Y-%m-%d %H:%M:%S")
+
+        # Store the token and expiry in the database
+        self.db.execute("UPDATE customers SET reset_token = ?, reset_token_expiry = ? WHERE email = ?", 
+                        (reset_token, reset_token_expiry, email))
+        
+        # Send an email to the user with the reset link
+        self.send_password_reset_email(email, reset_token)
+        messagebox.showinfo("Success", "A password reset link has been sent to your email.")
+
+    def send_password_reset_email(self, email, reset_token):
+        reset_link = f"http://localhost:8000/reset_password/{reset_token}"  # Example link, replace with your actual link
+        
+        msg = MIMEText(f"Click the link below to reset your password:\n\n{reset_link}")
+        msg["Subject"] = "Password Reset Request"
+        msg["From"] = "no-reply@lavenderbookstore.com"  # Replace with your email
+        msg["To"] = email
+
+        try:
+            # Configure SMTP server credentials here
+            smtp_server = "s"
+            smtp_port = 587
+            smtp_user = ""
+            smtp_password = ""
+
+            with smtplib.SMTP(smtp_server, smtp_port) as server:
+                server.starttls()
+                server.login(smtp_user, smtp_password)
+                server.sendmail(msg["From"], [msg["To"]], msg.as_string())
+
+            print(f"Password reset email sent to {email}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to send email: {e}")
+
+    def create_checkout_tab(self):
+        self.checkout_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.checkout_tab, text="Checkout")
+
+        # Cart display
+        self.cart_tree = ttk.Treeview(self.checkout_tab, columns=("ID", "Title", "Author", "Price", "Quantity"), show='headings')
+        self.cart_tree.heading("ID", text="ID")
+        self.cart_tree.heading("Title", text="Title")
+        self.cart_tree.heading("Author", text="Author")
+        self.cart_tree.heading("Price", text="Price")
+        self.cart_tree.heading("Quantity", text="Quantity")
+        self.cart_tree.pack(side='top', fill='both', expand=True)
+
+        # Total amount
+        self.total_label = ttk.Label(self.checkout_tab, text="Total: $0.00", font=('Helvetica', 14, 'bold'))
+        self.total_label.pack(pady=10)
+
+        # Payment details
+        payment_frame = ttk.Frame(self.checkout_tab)
+        payment_frame.pack(pady=10)
+
+        ttk.Label(payment_frame, text="Payment Method:").grid(row=0, column=0, padx=10, pady=5)
+        self.payment_method_combobox = ttk.Combobox(payment_frame, values=["Credit Card", "PayPal", "Bank Transfer"])
+        self.payment_method_combobox.current(0)
+        self.payment_method_combobox.grid(row=0, column=1, padx=10, pady=5)
+
+        ttk.Label(payment_frame, text="Card Number:").grid(row=1, column=0, padx=10, pady=5)
+        self.card_number_entry = ttk.Entry(payment_frame)
+        self.card_number_entry.grid(row=1, column=1, padx=10, pady=5)
+
+        ttk.Label(payment_frame, text="Expiration Date (MM/YY):").grid(row=2, column=0, padx=10, pady=5)
+        self.expiration_date_entry = ttk.Entry(payment_frame)
+        self.expiration_date_entry.grid(row=2, column=1, padx=10, pady=5)
+
+        ttk.Label(payment_frame, text="CVV:").grid(row=3, column=0, padx=10, pady=5)
+        self.cvv_entry = ttk.Entry(payment_frame, show="*")
+        self.cvv_entry.grid(row=3, column=1, padx=10, pady=5)
+
+        # Checkout button
+        checkout_button = ttk.Button(self.checkout_tab, text="Confirm Purchase", command=self.process_checkout)
+        checkout_button.pack(pady=20)
+
+    def process_checkout(self):
+        payment_method = self.payment_method_combobox.get()
+        card_number = self.card_number_entry.get()
+        expiration_date = self.expiration_date_entry.get()
+        cvv = self.cvv_entry.get()
+
+        if not card_number or not expiration_date or not cvv:
+            messagebox.showwarning("Input Error", "Please complete all payment fields.")
+            return
+
+        # Assuming the payment is processed successfully
+        try:
+            self.complete_purchase()
+            messagebox.showinfo("Success", "Your purchase has been completed successfully!")
+            self.clear_cart()
+        except Exception as e:
+            messagebox.showerror("Error", f"An error occurred during checkout: {e}")
+
+    def complete_purchase(self):
+        total_amount = 0
+        sale = Sale(customer_id=self.current_user_id)  # Initialize the Sale object
+
+        for item in self.cart_tree.get_children():
+            book_id, title, author, price, quantity = self.cart_tree.item(item, 'values')
+            total_amount += float(price) * int(quantity)
+
+            # Add the book to the sale
+            sale.add_book_to_sale(self.db, book_id, int(quantity))
+
+        # Record the sale in the database
+        sale.record_sale(self.db)
+
+        # Update total sales display
+        self.total_label.config(text=f"Total: ${total_amount:.2f}")
+
+    def clear_cart(self):
+        for item in self.cart_tree.get_children():
+            self.cart_tree.delete(item)
+        self.total_label.config(text="Total: $0.00")
 
     def on_closing(self):
         self.db.close()

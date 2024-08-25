@@ -103,48 +103,61 @@ class BookstoreApp:
             messagebox.showwarning("Input Error", "User not found. Please try again.")
                         
     def create_signup_tab(self):
-        tab_exists = False
-        self.signup_tab = ttk.Frame(self.notebook)
+        # Close any existing login or register tabs
+        for i in range(self.notebook.index("end")):
+            tab_text = self.notebook.tab(i, "text")
+            if tab_text in ["Login", "Register"]:
+                self.notebook.forget(i)
+                break  # Break the loop after forgetting a tab to avoid index shift issues
 
+        # Check if the "Register" tab already exists
+        tab_exists = False
         for i in range(self.notebook.index("end")):
             if self.notebook.tab(i, "text") == "Register":
                 tab_exists = True
                 break
         
-        # Add the tab if it doesn't exist
+        # Add the "Register" tab if it doesn't exist
         if not tab_exists:
+            self.signup_tab = ttk.Frame(self.notebook)
             self.notebook.add(self.signup_tab, text="Register")
+            self.notebook.select(self.signup_tab)  # Automatically switch to the Sign-Up tab
 
-        # self.notebook.add(self.signup_tab, text="Register")
+            # Username Label and Entry
+            self.username_label = ttk.Label(self.signup_tab, text="Username:")
+            self.username_label.grid(row=0, column=0, padx=10, pady=10, sticky="e")
 
-        # Email Label and Entry
-        self.email_label = ttk.Label(self.signup_tab, text="Email:")
-        self.email_label.grid(row=1, column=0, padx=10, pady=10, sticky="e")
+            self.username_entry = ttk.Entry(self.signup_tab)
+            self.username_entry.grid(row=0, column=1, padx=10, pady=10, sticky="e")
 
-        self.email_entry = ttk.Entry(self.signup_tab)
-        self.email_entry.grid(row=1, column=1, padx=10, pady=10, sticky="e")
+            # Email Label and Entry
+            self.email_label = ttk.Label(self.signup_tab, text="Email:")
+            self.email_label.grid(row=1, column=0, padx=10, pady=10, sticky="e")
 
-        # Password Label and Entry
-        self.password_label = ttk.Label(self.signup_tab, text="Password:")
-        self.password_label.grid(row=2, column=0, padx=10, pady=10, sticky="e")
+            self.email_entry = ttk.Entry(self.signup_tab)
+            self.email_entry.grid(row=1, column=1, padx=10, pady=10, sticky="e")
 
-        self.password_entry = ttk.Entry(self.signup_tab, show="*")
-        self.password_entry.grid(row=2, column=1, padx=10, pady=10, sticky="e")
+            # Password Label and Entry
+            self.password_label = ttk.Label(self.signup_tab, text="Password:")
+            self.password_label.grid(row=2, column=0, padx=10, pady=10, sticky="e")
 
-        # Confirm Password Label and Entry
-        self.confirmPassword_label = ttk.Label(self.signup_tab, text="Confirm Password:")
-        self.confirmPassword_label.grid(row=3, column=0, padx=10, pady=10, sticky="e")
+            self.password_entry = ttk.Entry(self.signup_tab, show="*")
+            self.password_entry.grid(row=2, column=1, padx=10, pady=10, sticky="e")
 
-        self.confirmPassword = ttk.Entry(self.signup_tab, show="*")
-        self.confirmPassword.grid(row=3, column=1, padx=10, pady=10, sticky="e")
+            # Confirm Password Label and Entry
+            self.confirmPassword_label = ttk.Label(self.signup_tab, text="Confirm Password:")
+            self.confirmPassword_label.grid(row=3, column=0, padx=10, pady=10, sticky="e")
 
-        # Sign-Up Button
-        self.signup_button = ttk.Button(self.signup_tab, text="Sign Up", command=self.signup)
-        self.signup_button.grid(row=4, columnspan=2, pady=20)
+            self.confirmPassword = ttk.Entry(self.signup_tab, show="*")
+            self.confirmPassword.grid(row=3, column=1, padx=10, pady=10, sticky="e")
 
-        # Go back to the login page Button
-        button_login = ttk.Button(self.signup_tab, text="Or Login", command=self.create_login_tab)
-        button_login.grid(row=5, columnspan=2, pady=20)
+            # Sign-Up Button
+            self.signup_button = ttk.Button(self.signup_tab, text="Sign Up", command=self.signup)
+            self.signup_button.grid(row=4, columnspan=2, pady=20)
+
+            # Go back to the login page Button
+            button_login = ttk.Button(self.signup_tab, text="Or Login", command=self.create_login_tab)
+            button_login.grid(row=5, columnspan=2, pady=20)
 
     def signup(self):
         # Retrieve input data

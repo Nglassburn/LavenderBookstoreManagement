@@ -17,6 +17,9 @@ import smtplib
 from email.mime.text import MIMEText
 from datetime import datetime, timedelta
 import bcrypt
+from tkcalendar import DateEntry
+from tkinter.simpledialog import Toplevel
+
 
 
 class BookstoreApp:
@@ -27,6 +30,7 @@ class BookstoreApp:
         self.book_dict = {}  # Dictionary to store book titles and their IDs
         self.style = ttk.Style()  # For styling elements
         self.current_user_id = None #Initialize current_user_id
+        self.cart = [] #Initialize an empty cart
 
         # Create the notebook
         self.notebook = ttk.Notebook(root)
@@ -35,7 +39,7 @@ class BookstoreApp:
         # Create tabs
         self.create_login_tab()
         self.create_password_reset_request_tab()
-        self.create_checkout_tab()
+        #self.create_checkout_tab()
 
 
 
@@ -84,19 +88,32 @@ class BookstoreApp:
                     self.create_supplier_tab()
                     self.create_sales_tab()
                     self.create_order_tab()
+                    
+                    # Automatically switch to the home tab
+                    self.notebook.select(self.home_tab)
                 else:
                     self.create_book_catalog_tab()
+                    # Switch to the book catalog tab if it's a regular user
+                    self.notebook.select(self.book_catalog_tab)
 
                 messagebox.showinfo("Login Success", f"Welcome, {username}!")
             else:
                 messagebox.showwarning("Input Error", "Incorrect password. Please try again.")
         else:
             messagebox.showwarning("Input Error", "User not found. Please try again.")
-
+                        
     def create_signup_tab(self):
-        self.signup_tab = Register(self.notebook)
-        self.notebook.add(self.signup_tab, text="Register")
         self.signup_tab = ttk.Frame(self.notebook)
+        self.notebook.add(self.signup_tab, text="Register")
+        self.notebook.select(self.signup_tab)  # Automatically switch to the Sign-Up tab
+
+        # Username Label and Entry
+        self.username_label = ttk.Label(self.signup_tab, text="Username:")
+        self.username_label.grid(row=0, column=0, padx=10, pady=10, sticky="e")
+
+        self.username_entry = ttk.Entry(self.signup_tab)
+        self.username_entry.grid(row=0, column=1, padx=10, pady=10, sticky="e")
+
         # Email Label and Entry
         self.email_label = ttk.Label(self.signup_tab, text="Email:")
         self.email_label.grid(row=1, column=0, padx=10, pady=10, sticky="e")
@@ -127,22 +144,35 @@ class BookstoreApp:
         button_login.grid(row=5, columnspan=2, pady=20)
 
     def signup(self):
+        # Retrieve input data
         username = self.username_entry.get()
         email = self.email_entry.get()
         password = self.password_entry.get()
+        confirm_password = self.confirmPassword.get()
+
+        # Check if passwords match
+        if password != confirm_password:
+            messagebox.showerror("Error", "Passwords do not match!")
+            return
 
         # Hash the password
         hashed_password = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt())
 
+        # Provide a default address if none is given
+        default_address = "N/A"  # or any default value you want to use
+
         # Store the hashed password in the database
-        self.db.execute(
-            "INSERT INTO customers (name, email, password, role) VALUES (?, ?, ?, ?)",
-            (username, email, hashed_password, 'user')  # Adjust 'user' to 'admin' if necessary
-        )
-
-        messagebox.showinfo("Success", "Account created successfully!")
-        self.create_login_tab()
-
+        try:
+            self.db.execute(
+                "INSERT INTO customers (name, email, password, address, role) VALUES (?, ?, ?, ?, ?)",
+                (username, email, hashed_password, default_address, 'user')  # Adjust 'user' to 'admin' if necessary
+            )
+            messagebox.showinfo("Success", "Account created successfully!")
+            self.notebook.forget(self.signup_tab)  # Close the sign-up tab
+            self.create_login_tab()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to create account: {e}")
+            
     def create_home_tab(self):
         self.home_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.home_tab, text='Home')
@@ -220,18 +250,34 @@ class BookstoreApp:
 
         item = self.book_catalog_tree.item(selected_item)
         book_id = item['values'][0]
-        quantity = 1  # Or allow users to select quantity
+        title = item['values'][1]
+        author = item['values'][2]
+        price = item['values'][4]
+        quantity = 1  # Default to 1 for simplicity, but you can allow users to select quantity
 
-        # Process the purchase (you'll need to tie this into your existing sale logic)
-        try:
-            sale = Sale(customer_id=self.current_user_id)
-            sale.add_book_to_sale(self.db, book_id, quantity)
-            sale.record_sale(self.db)
-            messagebox.showinfo("Success", "Purchase successful!")
-        except Exception as e:
-            messagebox.showerror("Error", f"An unexpected error occurred: {e}")
+        # Add the selected book to the cart
+        self.cart.append((book_id, title, author, price, quantity))
 
+        # Update the checkout cart display
+        self.update_cart_display()
+        messagebox.showinfo("Success", f"Added {title} to your cart!")
+        
+    def create_checkout_tab(self):
+        # ... (existing code)
+        self.update_cart_display()
 
+    def update_cart_display(self):
+        for item in self.cart_tree.get_children():
+            self.cart_tree.delete(item)
+        
+        total_amount = 0
+        for book_id, title, author, price, quantity in self.cart:
+            total_amount += float(price) * quantity
+            self.cart_tree.insert('', 'end', values=(book_id, title, author, price, quantity))
+        
+        # Update total amount label
+        self.total_label.config(text=f"Total: ${total_amount:.2f}")
+        
     def create_inventory_tab(self):
         self.inventory_tab = ttk.Frame(self.notebook)
         self.notebook.add(self.inventory_tab, text='Inventory')
@@ -386,6 +432,28 @@ class BookstoreApp:
 
         # Add customer form
         self.add_customer_form()
+
+        # Add delete customer button
+        self.delete_customer_button = ttk.Button(self.customer_tab, text="Delete Selected Customer", command=self.delete_customer)
+        self.delete_customer_button.pack(side='top', fill='x')
+
+    def delete_customer(self):
+        selected_item = self.customer_tree.selection()
+        if not selected_item:
+            messagebox.showwarning("Warning", "No customer selected")
+            return
+
+        item = self.customer_tree.item(selected_item)
+        customer_id = item['values'][0]
+
+        confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete customer ID {customer_id}?")
+        if confirm:
+            try:
+                self.db.execute("DELETE FROM customers WHERE id = ?", (customer_id,))
+                messagebox.showinfo("Success", f"Customer ID {customer_id} deleted successfully!")
+                self.refresh_customers()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to delete customer: {e}")
 
     def add_customer_form(self):
         self.add_customer_frame = ttk.Frame(self.customer_tab)
@@ -591,29 +659,19 @@ class BookstoreApp:
         # Export Button
         self.create_export_button()
 
-    def plot_sales_over_time(self, sales_data):
-        # Prepare data for plotting
-        df = pd.DataFrame(sales_data, columns=["Date", "Book Title", "Quantity", "Total Amount"])
-        df["Date"] = pd.to_datetime(df["Date"])
-        df = df.groupby("Date")["Total Amount"].sum().reset_index()
-
-        # Create the plot with animations
-        fig, ax = plt.subplots()
-        ax.plot(df["Date"], df["Total Amount"], marker="o", color='#8A2BE2')  # Lavender color
-        ax.set_title("Sales Over Time", fontdict={'fontsize': 16, 'fontweight': 'bold'})
-        ax.set_xlabel("Date")
-        ax.set_ylabel("Total Sales ($)")
-        ax.grid(True)
-
-        # Display the plot in the Tkinter GUI
-        for widget in self.chart_frame.winfo_children():
-            widget.destroy()  # Clear any previous chart
-        canvas = FigureCanvasTkAgg(fig, master=self.chart_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True)
+    def get_sales_data(self, start_date, end_date):
+        query = """
+        SELECT s.date, SUM(sb.quantity * b.price) as total_amount
+        FROM sales s
+        JOIN sale_books sb ON s.id = sb.sale_id
+        JOIN books b ON sb.book_id = b.id
+        WHERE s.date BETWEEN ? AND ?
+        GROUP BY s.date
+        ORDER BY s.date;
+        """
+        return self.db.fetchall(query, (start_date, end_date))
 
     def generate_sales_report(self):
-        # Determine the date range based on user selection
         date_range = self.date_range_combobox.get()
         if date_range == "Today":
             start_date = end_date = datetime.today().date()
@@ -630,18 +688,45 @@ class BookstoreApp:
         sales_data = self.db.get_sales_data(start_date, end_date)
         summary = self.db.get_total_sales_summary(start_date, end_date)
 
-        # Update summary labels with correct tuple indexing
+        # If there's no data, skip updating the UI without showing an error message
+        if not sales_data:
+            return
+
+        # Update summary labels
         self.total_sales_label.config(text=f"Total Sales: ${summary[1]:.2f}")
         self.transactions_label.config(text=f"Transactions: {summary[0]}")
 
-        # Update the sales table
+        # Clear the existing data in the Treeview
         for item in self.sales_tree.get_children():
             self.sales_tree.delete(item)
+
+        # Insert new sales data into the Treeview
         for sale in sales_data:
             self.sales_tree.insert('', 'end', values=sale)
 
-        # Plot sales over time
-        self.plot_sales_over_time(sales_data)
+        # Plot sales data over time
+        self.plot_sales_over_time([(sale[0], sale[3]) for sale in sales_data])
+
+    def plot_sales_over_time(self, sales_data):
+        df = pd.DataFrame(sales_data, columns=["Date", "Total Amount"])
+        df["Date"] = pd.to_datetime(df["Date"])
+        df = df.groupby("Date")["Total Amount"].sum().reset_index()
+
+        if df.empty:
+            return  # Simply return if there's no data without showing an error message
+
+        fig, ax = plt.subplots()
+        ax.plot(df["Date"], df["Total Amount"], marker="o", color='#8A2BE2')
+        ax.set_title("Sales Over Time", fontdict={'fontsize': 16, 'fontweight': 'bold'})
+        ax.set_xlabel("Date")
+        ax.set_ylabel("Total Sales ($)")
+        ax.grid(True)
+
+        for widget in self.chart_frame.winfo_children():
+            widget.destroy()
+        canvas = FigureCanvasTkAgg(fig, master=self.chart_frame)
+        canvas.draw()
+        canvas.get_tk_widget().pack(fill="both", expand=True)
 
     def sort_sales_table(self, col):
         # Get data from the treeview and sort it
@@ -655,9 +740,18 @@ class BookstoreApp:
 
     def search_sales_table(self):
         query = self.search_entry.get()
+
+        # Assuming the sales table is joined with the books table to get the book titles
+        sales = self.db.fetchall(f"""
+            SELECT s.date, b.title, sb.quantity, (sb.quantity * b.price) as total_amount
+            FROM sales s
+            JOIN sale_books sb ON s.id = sb.sale_id
+            JOIN books b ON sb.book_id = b.id
+            WHERE b.title LIKE ?
+        """, ('%' + query + '%',))
+
         for item in self.sales_tree.get_children():
             self.sales_tree.delete(item)
-        sales = self.db.fetchall(f"SELECT * FROM sales WHERE book_title LIKE '%{query}%'")
         for sale in sales:
             self.sales_tree.insert('', 'end', values=sale)
 
@@ -671,10 +765,33 @@ class BookstoreApp:
         pass
 
     def select_custom_date_range(self):
-        # Implement a custom date range selector (for simplicity, return a static range)
-        start_date = datetime.today().date() - timedelta(days=30)
-        end_date = datetime.today().date()
-        return start_date, end_date
+        # Create a Toplevel window to select the date range
+        top = Toplevel(self.root)
+        top.title("Select Custom Date Range")
+
+        start_label = ttk.Label(top, text="Start Date:")
+        start_label.grid(row=0, column=0, padx=10, pady=10)
+        start_date_entry = DateEntry(top)
+        start_date_entry.grid(row=0, column=1, padx=10, pady=10)
+
+        end_label = ttk.Label(top, text="End Date:")
+        end_label.grid(row=1, column=0, padx=10, pady=10)
+        end_date_entry = DateEntry(top)
+        end_date_entry.grid(row=1, column=1, padx=10, pady=10)
+
+        def apply():
+            start_date = start_date_entry.get_date()
+            end_date = end_date_entry.get_date()
+            top.destroy()
+            self.custom_date_range_selected(start_date, end_date)
+
+        apply_button = ttk.Button(top, text="Apply", command=apply)
+        apply_button.grid(row=2, columnspan=2, pady=10)
+
+    def custom_date_range_selected(self, start_date, end_date):
+        self.start_date = start_date
+        self.end_date = end_date
+        self.generate_sales_report()
 
     def create_order_tab(self):
         self.order_tab = ttk.Frame(self.notebook)
@@ -898,6 +1015,9 @@ class BookstoreApp:
         checkout_button.pack(pady=20)
 
     def process_checkout(self):
+        if not self.cart:
+            messagebox.showwarning("Input Error", "Your cart is empty.")
+            return
         payment_method = self.payment_method_combobox.get()
         card_number = self.card_number_entry.get()
         expiration_date = self.expiration_date_entry.get()
@@ -907,7 +1027,6 @@ class BookstoreApp:
             messagebox.showwarning("Input Error", "Please complete all payment fields.")
             return
 
-        # Assuming the payment is processed successfully
         try:
             self.complete_purchase()
             messagebox.showinfo("Success", "Your purchase has been completed successfully!")
@@ -919,8 +1038,7 @@ class BookstoreApp:
         total_amount = 0
         sale = Sale(customer_id=self.current_user_id)  # Initialize the Sale object
 
-        for item in self.cart_tree.get_children():
-            book_id, title, author, price, quantity = self.cart_tree.item(item, 'values')
+        for book_id, title, author, price, quantity in self.cart:
             total_amount += float(price) * int(quantity)
 
             # Add the book to the sale
@@ -929,14 +1047,17 @@ class BookstoreApp:
         # Record the sale in the database
         sale.record_sale(self.db)
 
+        # Clear the cart after purchase
+        self.cart.clear()
+        self.update_cart_display()  # Update cart display to reflect the cleared cart
+
         # Update total sales display
         self.total_label.config(text=f"Total: ${total_amount:.2f}")
-
+        
     def clear_cart(self):
-        for item in self.cart_tree.get_children():
-            self.cart_tree.delete(item)
-        self.total_label.config(text="Total: $0.00")
-
+        self.cart.clear()  # Clear the cart list
+        self.update_cart_display()  # Clear the display in the checkout tab
+        
     def on_closing(self):
         self.db.close()
         self.root.destroy()

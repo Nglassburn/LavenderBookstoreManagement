@@ -103,16 +103,19 @@ class BookstoreApp:
             messagebox.showwarning("Input Error", "User not found. Please try again.")
                         
     def create_signup_tab(self):
+        tab_exists = False
         self.signup_tab = ttk.Frame(self.notebook)
-        self.notebook.add(self.signup_tab, text="Register")
-        self.notebook.select(self.signup_tab)  # Automatically switch to the Sign-Up tab
 
-        # Username Label and Entry
-        self.username_label = ttk.Label(self.signup_tab, text="Username:")
-        self.username_label.grid(row=0, column=0, padx=10, pady=10, sticky="e")
+        for i in range(self.notebook.index("end")):
+            if self.notebook.tab(i, "text") == "Register":
+                tab_exists = True
+                break
+        
+        # Add the tab if it doesn't exist
+        if not tab_exists:
+            self.notebook.add(self.signup_tab, text="Register")
 
-        self.username_entry = ttk.Entry(self.signup_tab)
-        self.username_entry.grid(row=0, column=1, padx=10, pady=10, sticky="e")
+        # self.notebook.add(self.signup_tab, text="Register")
 
         # Email Label and Entry
         self.email_label = ttk.Label(self.signup_tab, text="Email:")

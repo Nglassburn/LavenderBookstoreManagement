@@ -10,13 +10,14 @@ Welcome to the Lavender Bookstore Management System – a simple, user-friendly 
     Secure Login: Admin and user roles with password protection, ensuring that the right people have the right access.
 
 📖 How to Get Started
-Clone the Repository:
+
+**Clone the Repository:**
 
 bash
 
 git clone https://github.com/yourusername/lavender-bookstore-management.git
 
-Run the Application:
+**Run the Application:**
 
 Just launch the gui.py file, and you’ll be good to go!
 

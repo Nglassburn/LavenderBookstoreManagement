@@ -37,6 +37,6 @@ python gui.py
 Because managing a bookstore should be as relaxing as a lavender-scented breeze. Our goal was to create a system that’s not just functional but enjoyable to use.
 🎓 About the Project
 
-This project was developed as part of a class group assignment, where we collaborated to simulate a fully operational bookstore management system. It helped us dive deeper into Python programming, database management, and teamwork.
+This project was developed as part of a class group assignment using the Scrum framework, where we worked together in sprints to simulate a fully operational bookstore management system. It helped us dive deeper into Python programming, database management, and teamwork.
 
 Whether you're managing a small book collection or planning to expand into the bookish empire of your dreams, Lavender Bookstore Management System has you covered. 🌿
